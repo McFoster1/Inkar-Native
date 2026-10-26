@@ -120,7 +120,7 @@ private fun Phase0Screen() {
         Spacer(Modifier.height(20.dp))
         Button(
             onClick = { taps++ },
-            colors = ButtonDefaults.buttonColors(containerColor = InkarBlue),
+            colors = ButtonDefaults.buttonColors(containerColor = InkarBlue, contentColor = Color.White),
             shape = RoundedCornerShape(14.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
