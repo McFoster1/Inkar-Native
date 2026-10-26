@@ -1,0 +1,57 @@
+name: Build Kotlin APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number, for example 0.1.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Build the APK
+        run: gradle assembleRelease --no-daemon -PappVersionName=${{ inputs.version }} -PappVersionCode=${{ github.run_number }}
+
+      - name: Sign the APK
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          UNSIGNED=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > release.jks
+          else
+            echo "No signing key found, using a temporary test key."
+            KS_PASS=android; KEY_ALIAS=testkey; KEY_PASS=android
+            keytool -genkeypair -keystore release.jks -storepass android -keypass android -alias testkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Inkar Test"
+          fi
+          "$BT/zipalign" -p -f 4 "$UNSIGNED" aligned.apk
+          "$BT/apksigner" sign --ks release.jks --ks-pass pass:"$KS_PASS" --ks-key-alias "$KEY_ALIAS" --key-pass pass:"$KEY_PASS" --out "Inkar-native-v${{ inputs.version }}.apk" aligned.apk
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: native-v${{ inputs.version }}
+          name: Inkar native v${{ inputs.version }}
+          files: Inkar-native-v${{ inputs.version }}.apk
+          body: Development build of the native Kotlin version of Inkar. It installs next to the real Inkar.
+          prerelease: true
