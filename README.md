@@ -7,3 +7,7 @@ During development it installs as **Inkar (dev)** with the app ID `com.mcfoster.
 ## Build
 
 Go to **Actions > Build Kotlin APK > Run workflow**, enter a version (for example `0.1.0`) and run it. The APK appears under **Releases** after a few minutes.
+
+## Status
+
+Phase 1: bottom navigation, stories, chapters (create, rename, delete, reorder), covers, backup import and export (same file as the HTML app). Write and Stats tabs are placeholders.
