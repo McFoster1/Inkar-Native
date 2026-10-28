@@ -4,7 +4,11 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -72,21 +76,71 @@ fun VecIcon(@DrawableRes id: Int, tint: Color, size: Dp = 24.dp) {
 }
 
 @Composable
-fun Btn(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false, small: Boolean = false) {
+fun Btn(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    small: Boolean = false,
+    danger: Boolean = false,
+    bad: Boolean = false,
+    @DrawableRes icon: Int? = null,
+    enabled: Boolean = true,
+) {
     val shape = RoundedCornerShape(8.dp)
-    Box(
+    val bg = when {
+        danger -> InkBad
+        primary -> InkBlue
+        bad -> InkBad.copy(alpha = 0.12f)
+        else -> InkEl
+    }
+    val borderC = when {
+        danger -> InkBad
+        primary -> InkBlue
+        bad -> InkBad.copy(alpha = 0.35f)
+        else -> InkBorder
+    }
+    val fg = when {
+        danger || primary -> Color.White
+        bad -> InkBad
+        else -> InkText
+    }
+    Row(
         modifier
             .heightIn(min = if (small) 32.dp else 40.dp)
             .clip(shape)
-            .background(if (primary) InkBlue else InkEl)
-            .border(1.dp, if (primary) InkBlue else InkBorder, shape)
-            .clickable(onClick = onClick)
+            .background(bg)
+            .border(1.dp, borderC, shape)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = if (small) 12.dp else 16.dp),
-        contentAlignment = Alignment.Center,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        Txt(text, if (small) 13f else 15f, if (primary) Color.White else InkText, FontWeight.Medium, lh = 1.2f)
+        if (icon != null) {
+            VecIcon(icon, fg, 16.dp)
+            Spacer(Modifier.width(6.dp))
+        }
+        Txt(text, if (small) 13f else 15f, fg, FontWeight.Medium, lh = 1.2f)
     }
 }
+
+/** Square 36 dp icon button (the HTML app's "btn sm ib"). */
+@Composable
+fun IconSq(@DrawableRes icon: Int, onClick: () -> Unit, bad: Boolean = false, enabled: Boolean = true) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        Modifier.size(36.dp).clip(shape)
+            .background(if (bad) InkBad.copy(alpha = 0.12f) else InkEl)
+            .border(1.dp, if (bad) InkBad.copy(alpha = 0.35f) else InkBorder, shape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        VecIcon(icon, (if (bad) InkBad else InkText).copy(alpha = if (enabled) 1f else 0.4f), 18.dp)
+    }
+}
+
+/** Joins meta parts with " · " and keeps each part on one line ("Oct 8" never splits). */
+fun metaLine(vararg parts: String): String = parts.joinToString(" · ") { it.replace(' ', '\u00A0') }
 
 @Composable
 fun SquareIconBtn(@DrawableRes id: Int, onClick: () -> Unit) {

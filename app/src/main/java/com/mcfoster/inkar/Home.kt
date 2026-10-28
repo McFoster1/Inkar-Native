@@ -61,18 +61,6 @@ fun HomeScreen(repo: Repo, onOpenStory: (String) -> Unit, onNewStory: () -> Unit
     val cols = if (LocalConfiguration.current.screenWidthDp >= 514) 3 else 2
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Brand(18)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                SquareIconBtn(R.drawable.ic_search) { toast(ctx, "Search arrives in a later phase") }
-                Btn("◐ Theme", { toast(ctx, "Theme switching arrives in a later phase") }, small = true)
-            }
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(InkBorder))
 
         Column(
             Modifier.weight(1f)
@@ -186,7 +174,7 @@ fun HomeScreen(repo: Repo, onOpenStory: (String) -> Unit, onNewStory: () -> Unit
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Txt(s.title, 16f, InkText, FontWeight.SemiBold)
-                                Txt("${s.genre} · ${fmt(s.words)} words · ${s.chapters.size} ch · ${ago(s.updatedAt)}", 13f, InkMuted)
+                                Txt(metaLine(s.genre, "${fmt(s.words)} words", "${s.chapters.size} ch", ago(s.updatedAt)), 13f, InkMuted)
                             }
                             Spacer(Modifier.width(8.dp))
                             Btn("Continue", { onOpenStory(s.id) }, small = true)

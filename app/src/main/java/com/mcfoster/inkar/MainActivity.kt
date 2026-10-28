@@ -63,62 +63,67 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private sealed interface Screen {
-    data class Detail(val id: String) : Screen
-    data class Form(val id: String?) : Screen
-}
-
 @Composable
 private fun InkarApp(repo: Repo) {
     var tab by rememberSaveable { mutableStateOf(0) }
-    val stack = remember { mutableStateListOf<Screen>() }
+    var openStory by rememberSaveable { mutableStateOf<String?>(null) }
+    var storyTab by rememberSaveable { mutableStateOf("overview") }
+    var query by rememberSaveable { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf("All") }
+    var newRequested by remember { mutableStateOf(false) }
     val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
 
-    fun pop() {
-        if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex)
-    }
-
-    BackHandler(enabled = stack.isNotEmpty() || tab != 0) {
-        if (stack.isNotEmpty()) pop() else tab = 0
+    BackHandler(enabled = openStory != null || tab != 0) {
+        if (openStory != null) openStory = null else tab = 0
     }
 
     Column(Modifier.fillMaxSize().background(InkBg).statusBarsPadding().imePadding()) {
+        AppTopBar()
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (val top = stack.lastOrNull()) {
-                null -> when (tab) {
-                    0 -> HomeScreen(
-                        repo,
-                        onOpenStory = { id -> tab = 1; stack.add(Screen.Detail(id)) },
-                        onNewStory = { tab = 1; stack.add(Screen.Form(null)) },
-                    )
-                    1 -> StoriesScreen(
-                        repo,
-                        onOpen = { stack.add(Screen.Detail(it)) },
-                        onNew = { stack.add(Screen.Form(null)) },
-                    )
-                    2 -> ComingSoon("Write", "The writing screen arrives in Phase 2.")
-                    3 -> ComingSoon("Stats", "Charts and statistics arrive in Phase 3.")
-                    else -> MenuScreen(repo)
-                }
-                is Screen.Detail -> StoryDetailScreen(
+            when (tab) {
+                0 -> HomeScreen(
                     repo,
-                    top.id,
-                    onBack = { pop() },
-                    onEdit = { stack.add(Screen.Form(top.id)) },
-                )
-                is Screen.Form -> StoryFormScreen(
-                    repo,
-                    top.id,
-                    onBack = { pop() },
-                    onSaved = { savedId ->
-                        pop()
-                        if (top.id == null) stack.add(Screen.Detail(savedId))
+                    onOpenStory = { id ->
+                        tab = 1
+                        storyTab = "overview"
+                        openStory = id
+                    },
+                    onNewStory = {
+                        openStory = null
+                        newRequested = true
+                        tab = 1
                     },
                 )
+                1 -> {
+                    val id = openStory
+                    if (id == null) {
+                        StoriesPage(
+                            repo,
+                            query = query,
+                            onQuery = { query = it },
+                            filter = filter,
+                            onFilter = { filter = it },
+                            newRequested = newRequested,
+                            onNewHandled = { newRequested = false },
+                            onOpen = { sid ->
+                                storyTab = "overview"
+                                openStory = sid
+                            },
+                        )
+                    } else {
+                        StoryPage(repo, id, storyTab, onTab = { storyTab = it }, onBack = { openStory = null })
+                    }
+                }
+                2 -> ComingSoon("Write", "The writing screen arrives in Phase 2.")
+                3 -> ComingSoon("Stats", "Charts and statistics arrive in Phase 3.")
+                else -> MenuScreen(repo)
             }
         }
-        if (stack.isEmpty() && !imeOpen) {
-            BottomBar(tab) { tab = it }
+        if (!imeOpen) {
+            BottomBar(tab) {
+                if (it == 1) openStory = null
+                tab = it
+            }
         } else {
             Spacer(Modifier.navigationBarsPadding())
         }

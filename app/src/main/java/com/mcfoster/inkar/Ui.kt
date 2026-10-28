@@ -260,12 +260,11 @@ fun Bar(fraction: Float, color: Color = InkBlue) {
 
 @Composable
 fun Pill(text: String) {
-    val shape = RoundedCornerShape(50)
     Text(
         text,
         color = InkMuted,
-        fontSize = 11.sp,
-        modifier = Modifier.clip(shape).border(1.dp, InkBorder, shape).padding(horizontal = 9.dp, vertical = 3.dp),
+        fontSize = 12.sp,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF1A1E25)).padding(horizontal = 9.dp, vertical = 1.dp),
     )
 }
 

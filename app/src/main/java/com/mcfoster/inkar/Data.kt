@@ -27,6 +27,10 @@ val LEVELS = listOf(
 /** Read-only snapshots used by the UI (data classes, so Compose can compare them). */
 data class ChapterV(val id: String, val title: String, val words: Int, val updatedAt: Long)
 
+data class NoteV(val id: String, val title: String, val cat: String, val text: String, val updatedAt: Long)
+
+val NCATS = listOf("Character", "Place", "Plot", "Idea", "Other")
+
 data class StoryV(
     val id: String,
     val title: String,
@@ -37,6 +41,7 @@ data class StoryV(
     val cover: String?,
     val updatedAt: Long,
     val chapters: List<ChapterV>,
+    val notes: List<NoteV>,
 ) {
     val words: Int get() = chapters.sumOf { it.words }
 }
@@ -202,6 +207,9 @@ class Repo private constructor(context: Context) {
         updatedAt = s.optLong("updatedAt", 0),
         chapters = s.objs("chapters").map {
             ChapterV(it.optString("id"), it.optString("title", "Untitled"), it.optInt("words", 0), it.optLong("updatedAt", 0))
+        },
+        notes = s.objs("notes").map {
+            NoteV(it.optString("id"), it.optString("title", ""), it.optString("cat", "Other"), it.optString("text", ""), it.optLong("updatedAt", 0))
         },
     )
 
@@ -519,6 +527,82 @@ class Repo private constructor(context: Context) {
         val s = storyJson(id)
         if (s != null) return s.optString("title", "") to s.optString("color", "#818CF8")
         return "Deleted story" to "#94A3B8"
+    }
+
+    // ---------- notes, statistics and export ----------
+
+    fun createNote(sid: String, title: String, cat: String, text: String) {
+        val s = storyJson(sid) ?: return
+        val now = System.currentTimeMillis()
+        val n = JSONObject()
+        n.put("id", newId())
+        n.put("title", title)
+        n.put("cat", cat)
+        n.put("text", text)
+        n.put("createdAt", now)
+        n.put("updatedAt", now)
+        val arr = JSONArray()
+        arr.put(n)
+        for (x in s.objs("notes")) arr.put(x)
+        s.put("notes", arr)
+        commit()
+    }
+
+    fun updateNote(sid: String, nid: String, title: String, cat: String, text: String) {
+        val n = storyJson(sid)?.objs("notes")?.firstOrNull { it.optString("id") == nid } ?: return
+        n.put("title", title)
+        n.put("cat", cat)
+        n.put("text", text)
+        n.put("updatedAt", System.currentTimeMillis())
+        commit()
+    }
+
+    fun deleteNote(sid: String, nid: String) {
+        val s = storyJson(sid) ?: return
+        val arr = JSONArray()
+        for (x in s.objs("notes")) if (x.optString("id") != nid) arr.put(x)
+        s.put("notes", arr)
+        commit()
+    }
+
+    fun chTyped(cid: String): Int {
+        track()
+        return chapterTyped(cid)
+    }
+
+    fun chWeek(cid: String): Int {
+        track()
+        val log = root.getJSONObject("log")
+        var t = 0
+        for (i in 0..6) t += log.optJSONObject(LocalDate.now().minusDays(i.toLong()).toString())?.optInt(cid, 0) ?: 0
+        return t
+    }
+
+    fun last7(storyId: String): Int {
+        track()
+        val log = root.getJSONObject("log")
+        val owner = HashMap<String, String>()
+        for (s in root.objs("stories")) {
+            val sid = s.optString("id")
+            for (c in s.objs("chapters")) owner[c.optString("id")] = sid
+            owner[sid] = sid
+        }
+        var t = 0
+        for (i in 0..6) {
+            val l = log.optJSONObject(LocalDate.now().minusDays(i.toLong()).toString()) ?: continue
+            for (k in l.keyList()) if (owner[k] == storyId) t += l.optInt(k, 0)
+        }
+        return t
+    }
+
+    fun chapterContent(sid: String, cid: String): String =
+        storyJson(sid)?.objs("chapters")?.firstOrNull { it.optString("id") == cid }?.optString("content", "") ?: ""
+
+    /** Whole-story text for export, or null if the story has no chapters. */
+    fun storyExportBody(sid: String): String? {
+        val chs = storyJson(sid)?.objs("chapters") ?: return null
+        if (chs.isEmpty()) return null
+        return chs.joinToString("\n\n\n") { it.optString("title", "") + "\n\n" + it.optString("content", "").trim() }
     }
 
     // ---------- settings ----------
