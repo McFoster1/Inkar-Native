@@ -1,6 +1,7 @@
 package com.mcfoster.inkar
 
 import android.graphics.Color as AColor
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -8,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -31,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -48,18 +51,30 @@ import androidx.compose.ui.unit.sp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(AColor.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(AColor.TRANSPARENT),
-        )
         val repo = Repo.get(applicationContext)
+        Theme.mode = repo.theme()
+        Theme.sysDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        applyBars(Theme.isLight)
         setContent {
-            MaterialTheme(colorScheme = InkarColors) {
+            val saved = repo.theme()
+            val sysDark = isSystemInDarkTheme()
+            SideEffect {
+                Theme.mode = saved
+                Theme.sysDark = sysDark
+            }
+            val light = Theme.isLight
+            SideEffect { applyBars(light) }
+            MaterialTheme(colorScheme = inkColorScheme()) {
                 Surface(modifier = Modifier.fillMaxSize(), color = InkBg) {
                     InkarApp(repo)
                 }
             }
         }
+    }
+
+    private fun applyBars(light: Boolean) {
+        val style = if (light) SystemBarStyle.light(AColor.TRANSPARENT, AColor.TRANSPARENT) else SystemBarStyle.dark(AColor.TRANSPARENT)
+        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
     }
 }
 
@@ -78,7 +93,7 @@ private fun InkarApp(repo: Repo) {
     }
 
     Column(Modifier.fillMaxSize().background(InkBg).statusBarsPadding().imePadding()) {
-        AppTopBar()
+        AppTopBar(repo)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 0 -> HomeScreen(

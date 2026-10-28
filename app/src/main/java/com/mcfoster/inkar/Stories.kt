@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -156,12 +157,10 @@ private fun deleteStoryMessage(s: StoryV): String {
 
 @Composable
 private fun StoryCard(s: StoryV, onOpen: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit) {
-    var colH by remember { mutableStateOf(0) }
-    val coverH = maxOf(128.dp, with(LocalDensity.current) { colH.toDp() })
     Panel(padding = 16.dp) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            CoverImage(s.cover, s.title, s.color, 96.dp, coverH)
-            Column(Modifier.weight(1f).onSizeChanged { colH = it.height }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            CoverImage(s.cover, s.title, s.color, 96.dp, 128.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Txt(s.title, 16f, InkText, FontWeight.SemiBold)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Txt(s.genre, 13f, InkMuted)
@@ -267,6 +266,7 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
     val ctx = LocalContext.current
     var dlg by remember { mutableStateOf<SDlg?>(null) }
     var reorder by remember { mutableStateOf(false) }
+    var viewCover by remember { mutableStateOf(false) }
     var noteFilter by rememberSaveable { mutableStateOf("All") }
     var pendingExport by remember { mutableStateOf<Pair<String, String>?>(null) }
     val s = repo.storyView(id)
@@ -306,15 +306,18 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 96.dp),
         ) {
-            Txt("← Back to stories", 14f, InkMuted, modifier = Modifier.clickable(onClick = onBack).padding(bottom = 12.dp))
+            Row(Modifier.clickable(onClick = onBack).padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                VecIcon(R.drawable.ic_back, InkMuted, 16.dp)
+                Spacer(Modifier.width(6.dp))
+                Txt("Back to stories", 14f, InkMuted)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                CoverImage(s.cover, s.title, s.color, 140.dp, 186.dp)
+                Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable(enabled = s.cover != null) { viewCover = true }) {
+                    CoverImage(s.cover, s.title, s.color, 140.dp, (140f * 4f / 3f).dp)
+                }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Txt(s.title, 26f, InkText, FontWeight.SemiBold, spacing = -0.26f)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Txt(s.genre, 13f, InkMuted)
-                        Pill(s.status)
-                    }
+                    Txt(s.genre, 13f, InkMuted)
                     if (s.description.isNotBlank()) Txt(s.description, 15f, InkMuted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Btn("+ New Chapter", { dlg = SDlg.NewCh }, primary = true)
@@ -427,7 +430,7 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
                     val longest = s.chapters.maxOfOrNull { it.words } ?: 0
                     val stats = listOf(
                         "AVG WORDS / CHAPTER" to fmt(avg),
-                        "LONGEST CHAPTER" to fmt(longest),
+                        "MOST WORDS / CHAPTER" to fmt(longest),
                         "LAST 7 DAYS" to fmt(repo.last7(s.id)),
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -501,6 +504,9 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
         }
         Fab({ dlg = SDlg.NewCh }, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp))
     }
+
+    val coverData = s.cover
+    if (viewCover && coverData != null) CoverViewer(coverData) { viewCover = false }
 
     when (val d = dlg) {
         null -> {}

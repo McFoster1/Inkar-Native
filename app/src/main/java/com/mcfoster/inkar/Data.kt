@@ -607,6 +607,27 @@ class Repo private constructor(context: Context) {
 
     // ---------- settings ----------
 
+    fun theme(): String {
+        track()
+        val t = root.optString("theme", "dark")
+        return if (t == "light" || t == "system") t else "dark"
+    }
+
+    fun setTheme(t: String) {
+        root.put("theme", t)
+        commit()
+    }
+
+    fun bkEvery(): Int {
+        track()
+        return root.optInt("bkEvery", 14)
+    }
+
+    fun setBkEvery(days: Int) {
+        root.put("bkEvery", days)
+        commit()
+    }
+
     fun setProfile(name: String, goal: Int) {
         root.getJSONObject("profile").put("name", name.trim().ifEmpty { "Writer" })
         root.put("goal", goal.coerceIn(1, 100000))

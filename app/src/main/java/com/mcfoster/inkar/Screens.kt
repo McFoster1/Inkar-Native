@@ -76,6 +76,9 @@ fun rememberBackupExporter(repo: Repo): () -> Unit {
 
 // ---------- Menu ----------
 
+private val THEME_OPTS = listOf("Dark", "Light", "System")
+private val BK_OPTS = listOf(0 to "Off", 7 to "Every week", 14 to "Every 2 weeks", 30 to "Every month")
+
 @Composable
 fun MenuScreen(repo: Repo) {
     val ctx = LocalContext.current
@@ -84,6 +87,9 @@ fun MenuScreen(repo: Repo) {
     var pendingImport by remember { mutableStateOf<String?>(null) }
     var pendingCount by remember { mutableStateOf(0) }
     val lastExport = repo.lastExport()
+    val theme = repo.theme()
+    val bkEvery = repo.bkEvery()
+    val exportBackup = rememberBackupExporter(repo)
 
     @Suppress("DEPRECATION")
     val version = remember {
@@ -111,58 +117,57 @@ fun MenuScreen(repo: Repo) {
         }
     }
 
-    val exportBackup = rememberBackupExporter(repo)
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Txt("Settings", 26f, InkText, FontWeight.SemiBold, spacing = -0.26f)
 
-    Column(Modifier.fillMaxSize()) {
-        TopBar("Menu")
-        Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Panel {
-                Text("Profile", color = InkText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(12.dp))
-                InkField(name, { name = it }, "Your name")
-                Spacer(Modifier.height(12.dp))
-                InkField(goal, { goal = it.filter { ch -> ch.isDigit() }.take(6) }, "Daily word goal", keyboardType = KeyboardType.Number)
-                Spacer(Modifier.height(12.dp))
-                PrimaryButton("Save", {
-                    repo.setProfile(name, goal.toIntOrNull() ?: repo.goal())
-                    name = repo.name()
-                    goal = repo.goal().toString()
-                    toast(ctx, "Saved")
-                }, Modifier.fillMaxWidth())
-            }
+        HCard {
+            Txt("Profile", 18f, InkText, FontWeight.Bold)
+            HField(name, { name = it }, label = "Your name", maxLen = 60)
+            HField(goal, { goal = it.filter { ch -> ch.isDigit() }.take(6) }, label = "Daily word goal", keyboardType = KeyboardType.Number)
+            HSelect("Theme", theme.replaceFirstChar { it.uppercase() }, THEME_OPTS, { repo.setTheme(it.lowercase()) })
+            Spacer(Modifier.height(16.dp))
+            Btn("Save", {
+                repo.setProfile(name, goal.toIntOrNull() ?: repo.goal())
+                name = repo.name()
+                goal = repo.goal().toString()
+                toast(ctx, "Saved")
+            }, Modifier.fillMaxWidth(), primary = true)
+        }
 
-            Panel {
-                Text("Backup", color = InkText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Last backup: " + if (lastExport == 0L) "never" else ago(lastExport),
-                    color = InkMuted,
-                    fontSize = 13.sp,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text("Uses the same file as the HTML app, so backups work both ways.", color = InkDim, fontSize = 12.sp)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GhostButton("Import", { importPick.launch(arrayOf("*/*")) }, Modifier.weight(1f))
-                    PrimaryButton("Export", exportBackup, Modifier.weight(1f))
-                }
+        HCard {
+            Txt("Backup", 18f, InkText, FontWeight.Bold)
+            Txt(
+                "Last backup: " + if (lastExport == 0L) "never" else ago(lastExport),
+                15f, InkMuted, modifier = Modifier.padding(top = 4.dp),
+            )
+            Txt("Uses the same file as the HTML app, so backups work both ways.", 13f, InkDim, modifier = Modifier.padding(top = 2.dp))
+            HSelect(
+                "Backup reminder",
+                BK_OPTS.firstOrNull { it.first == bkEvery }?.second ?: "Every 2 weeks",
+                BK_OPTS.map { it.second },
+                { label -> repo.setBkEvery(BK_OPTS.first { it.second == label }.first) },
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Btn("Import", { importPick.launch(arrayOf("*/*")) }, Modifier.weight(1f))
+                Btn("Export", exportBackup, Modifier.weight(1f), primary = true)
             }
+        }
 
-            Panel {
-                Text("About", color = InkText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Text("Inkar-Native · version $version", color = InkMuted, fontSize = 13.sp)
-                Text("Phase 1: stories, chapters and backup", color = InkDim, fontSize = 12.sp)
-            }
+        HCard {
+            Txt("About", 18f, InkText, FontWeight.Bold)
+            Txt("Inkar-Native · version $version", 15f, InkMuted, modifier = Modifier.padding(top = 4.dp))
+            Txt("Phase 1: stories, chapters and backup", 13f, InkDim)
         }
     }
 
     val text = pendingImport
     if (text != null) {
-        ConfirmDialog(
+        ConfirmModal(
             "Replace current data?",
             "This backup has $pendingCount ${if (pendingCount == 1) "story" else "stories"}. Everything currently in this app will be replaced.",
             "Replace",
@@ -177,7 +182,6 @@ fun MenuScreen(repo: Repo) {
                     toast(ctx, "Could not restore that backup")
                 }
             },
-            danger = false,
         )
     }
 }

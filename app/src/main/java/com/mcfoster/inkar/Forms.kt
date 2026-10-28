@@ -1,6 +1,14 @@
 package com.mcfoster.inkar
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,7 +54,7 @@ import androidx.compose.ui.window.DialogProperties
 
 /** Top bar shown on every tab: logo, search and theme buttons (both inactive for now). */
 @Composable
-fun AppTopBar() {
+fun AppTopBar(repo: Repo) {
     val ctx = LocalContext.current
     Column {
         Row(
@@ -57,7 +65,7 @@ fun AppTopBar() {
             Brand(18)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 SquareIconBtn(R.drawable.ic_search) { toast(ctx, "Search arrives in a later phase") }
-                Btn("◐ Theme", { toast(ctx, "Theme switching arrives in a later phase") }, small = true)
+                Btn("◐ Theme", { repo.setTheme(if (Theme.isLight) "dark" else "light") }, small = true)
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(InkBorder))
@@ -206,5 +214,55 @@ fun NameDialog(heading: String, label: String, initial: String, confirm: String,
         Txt(heading, 20f, InkText, FontWeight.SemiBold)
         HField(t, { t = it }, label = label, maxLen = 120)
         DialogActions(onCancel = onDismiss) { Btn(confirm, { onConfirm(t.trim().ifEmpty { "Untitled" }) }, primary = true) }
+    }
+}
+
+/** Full-screen cover viewer: tap to close, pinch to zoom, double-tap to reset. */
+@Composable
+fun CoverViewer(cover: String, onDismiss: () -> Unit) {
+    val bmp = remember(cover) { coverBitmap(cover) }
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            Modifier.fillMaxSize().background(Color(0xF2000000))
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            if (scale > 1f) {
+                                scale = 1f
+                                offset = Offset.Zero
+                            } else {
+                                onDismiss()
+                            }
+                        },
+                        onDoubleTap = {
+                            scale = 1f
+                            offset = Offset.Zero
+                        },
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 5f)
+                        offset = if (scale > 1f) offset + pan else Offset.Zero
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (bmp != null) {
+                Image(
+                    bitmap = bmp,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().padding(24.dp).graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
+                )
+            }
+        }
     }
 }

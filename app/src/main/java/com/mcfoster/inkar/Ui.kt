@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,23 +71,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
-val InkBlue = Color(0xFF2563EB)
-val InkBg = Color(0xFF0B0D10)
-val InkCard = Color(0xFF13161B)
-val InkNav = InkCard
-val InkBorder = Color(0x14FFFFFF)
-val InkText = Color(0xF2FFFFFF)
-val InkMuted = Color(0xA6FFFFFF)
-val InkDim = Color(0x61FFFFFF)
-val InkBad = Color(0xFFEF4444)
+/** Theme choice: "dark", "light" or "system". Colours below follow it, so every screen restyles at once. */
+object Theme {
+    var mode by mutableStateOf("dark")
+    var sysDark by mutableStateOf(true)
+    val isLight: Boolean get() = mode == "light" || (mode == "system" && !sysDark)
+}
 
-val InkarColors = darkColorScheme(
-    primary = InkBlue,
-    background = InkBg,
-    surface = InkBg,
-    onBackground = InkText,
-    onSurface = InkText,
-)
+val InkBlue = Color(0xFF2563EB)
+val InkOk = Color(0xFF22C55E)
+val InkBad = Color(0xFFEF4444)
+val InkBg: Color get() = if (Theme.isLight) Color(0xFFF5F6F8) else Color(0xFF0B0D10)
+val InkCard: Color get() = if (Theme.isLight) Color(0xFFFFFFFF) else Color(0xFF13161B)
+val InkNav: Color get() = InkCard
+val InkEl: Color get() = if (Theme.isLight) Color(0xFFECEEF2) else Color(0xFF1A1E25)
+val InkBorder: Color get() = if (Theme.isLight) Color(0x17000000) else Color(0x14FFFFFF)
+val InkText: Color get() = if (Theme.isLight) Color(0xF20A0C10) else Color(0xF2FFFFFF)
+val InkMuted: Color get() = if (Theme.isLight) Color(0xA60A0C10) else Color(0xA6FFFFFF)
+val InkDim: Color get() = if (Theme.isLight) Color(0x6B0A0C10) else Color(0x61FFFFFF)
+val InkGlow: Color get() = if (Theme.isLight) Color(0x142563EB) else Color(0x2E2563EB)
+val InkPop: Color get() = if (Theme.isLight) Color(0xEBFFFFFF) else Color(0xE61A1E25)
+
+fun inkColorScheme() = if (Theme.isLight) {
+    lightColorScheme(primary = InkBlue, background = InkBg, surface = InkBg, onBackground = InkText, onSurface = InkText)
+} else {
+    darkColorScheme(primary = InkBlue, background = InkBg, surface = InkBg, onBackground = InkText, onSurface = InkText)
+}
 
 fun onMain(block: () -> Unit) {
     Handler(Looper.getMainLooper()).post(block)
@@ -264,7 +274,7 @@ fun Pill(text: String) {
         text,
         color = InkMuted,
         fontSize = 12.sp,
-        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF1A1E25)).padding(horizontal = 9.dp, vertical = 1.dp),
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(InkEl).padding(horizontal = 9.dp, vertical = 1.dp),
     )
 }
 
@@ -399,7 +409,7 @@ fun CoverImage(cover: String?, letter: String, colorHex: String, width: Dp, heig
         )
     } else {
         Box(
-            Modifier.size(width, height).clip(shape).background(Color(0xFF1A1E25)).border(1.dp, InkBorder, shape),
+            Modifier.size(width, height).clip(shape).background(InkEl).border(1.dp, InkBorder, shape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -411,3 +421,5 @@ fun CoverImage(cover: String?, letter: String, colorHex: String, width: Dp, heig
         }
     }
 }
+
+fun coverBitmap(data: String): ImageBitmap? = decodeCover(data)

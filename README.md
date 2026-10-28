@@ -10,4 +10,4 @@ Go to **Actions > Build Kotlin APK > Run workflow**, enter a version (for exampl
 
 ## Status
 
-Phase 1.3: Stories tab rebuilt to match the HTML app (list, story page with Overview, Chapters, Notes and Analytics tabs, dialogs, export). Write and Stats tabs are placeholders.
+Phase 1.4: working Dark/Light/System theme, 3:4 covers with a full-screen viewer, story page and Analytics tweaks, Theme and Backup reminder in the Menu. Write and Stats tabs are placeholders.

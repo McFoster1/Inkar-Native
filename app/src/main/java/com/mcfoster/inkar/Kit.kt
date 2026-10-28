@@ -36,10 +36,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val InkEl = Color(0xFF1A1E25)
-val InkOk = Color(0xFF22C55E)
-val InkGlow = Color(0x2E2563EB)
-
 /** Text with the HTML app's 1.5 line height by default. */
 @Composable
 fun Txt(

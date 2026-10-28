@@ -349,7 +349,7 @@ fun WritingChartCard(repo: Repo, goal: Int, sel: Int?, onSel: (Int?) -> Unit) {
 private fun ChartPopup(repo: Repo, p: Pt, ids: List<String>, goal: Int, cum: Boolean, idx: Int, onClose: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Column(
-        Modifier.width(IntrinsicSize.Max).clip(shape).background(Color(0xE61A1E25)).border(1.dp, InkBorder, shape)
+        Modifier.width(IntrinsicSize.Max).clip(shape).background(InkPop).border(1.dp, InkBorder, shape)
             .pointerInput(Unit) { detectTapGestures { } }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
