@@ -46,6 +46,13 @@ data class StoryV(
     val words: Int get() = chapters.sumOf { it.words }
 }
 
+/** Same word rule as the HTML app: runs of non-space characters. */
+private val WORD = Regex("[^\\s\\u00A0\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+")
+
+fun wc(t: String): Int = WORD.findAll(t).count()
+
+class EditChapter(val title: String, val html: String, val content: String, val storyTitle: String)
+
 data class ChartDay(val date: LocalDate, val words: Map<String, Int>)
 
 class LevelInfo(
@@ -88,6 +95,13 @@ private fun JSONObject.objs(key: String): List<JSONObject> {
  * move between both apps untouched. Unknown keys are kept as they are.
  */
 class Repo private constructor(context: Context) {
+    var levelUp by mutableStateOf<LevelInfo?>(null)
+        private set
+
+    fun dismissLevelUp() {
+        levelUp = null
+    }
+
     private val file = File(context.filesDir, "inkar-state.json")
     private val io = Executors.newSingleThreadExecutor()
     private var root: JSONObject = JSONObject()
@@ -603,6 +617,84 @@ class Repo private constructor(context: Context) {
         val chs = storyJson(sid)?.objs("chapters") ?: return null
         if (chs.isEmpty()) return null
         return chs.joinToString("\n\n\n") { it.optString("title", "") + "\n\n" + it.optString("content", "").trim() }
+    }
+
+    // ---------- writing ----------
+
+    /** Reads a chapter for the editor without subscribing to changes. */
+    fun chapterForEdit(sid: String, cid: String): EditChapter? {
+        val s = storyJson(sid) ?: return null
+        val c = s.objs("chapters").firstOrNull { it.optString("id") == cid } ?: return null
+        return EditChapter(c.optString("title", "Untitled"), c.optString("html", ""), c.optString("content", ""), s.optString("title", ""))
+    }
+
+    fun setLast(sid: String, cid: String) {
+        val o = JSONObject()
+        o.put("sid", sid)
+        o.put("cid", cid)
+        root.put("last", o)
+        persist()
+    }
+
+    /** The chapter the Write tab reopens, if it still exists. */
+    fun lastChapter(): Pair<String, String>? {
+        val l = root.optJSONObject("last") ?: return null
+        val sid = l.optString("sid")
+        val cid = l.optString("cid")
+        val ok = storyJson(sid)?.objs("chapters")?.any { it.optString("id") == cid } == true
+        return if (ok) sid to cid else null
+    }
+
+    fun editorFontPeek(): String = root.optJSONObject("ed")?.optString("font", "lora") ?: "lora"
+
+    fun editorSizePeek(): Int = root.optJSONObject("ed")?.optInt("size", 16) ?: 16
+
+    fun setEditorFont(f: String) {
+        root.getJSONObject("ed").put("font", f)
+        persist()
+    }
+
+    fun setEditorSize(n: Int) {
+        root.getJSONObject("ed").put("size", n)
+        persist()
+    }
+
+    /** Saves a chapter and logs newly written words (same rules as the HTML app). */
+    fun saveChapter(sid: String, cid: String, text: String, html: String, title: String) {
+        val s = storyJson(sid) ?: return
+        val c = s.objs("chapters").firstOrNull { it.optString("id") == cid } ?: return
+        val w = wc(text)
+        val d = w - c.optInt("words", 0)
+        if (d > 0) {
+            val day = LocalDate.now().toString()
+            val act = root.getJSONObject("activity")
+            act.put(day, act.optInt(day, 0) + d)
+            val log = root.getJSONObject("log")
+            val l = log.optJSONObject(day) ?: JSONObject().also { log.put(day, it) }
+            l.put(cid, l.optInt(cid, 0) + d)
+        }
+        val now = System.currentTimeMillis()
+        c.put("words", w)
+        c.put("content", text)
+        c.put("html", html)
+        c.put("title", title.trim().ifEmpty { "Untitled" })
+        c.put("updatedAt", now)
+        s.put("updatedAt", now)
+        levelCheck()
+        commit()
+    }
+
+    private fun levelCheck() {
+        val l = levelFor(lifeWords())
+        val cur = if (root.isNull("lvl")) -1 else root.optInt("lvl", -1)
+        if (cur < 0 || l.index < cur) {
+            root.put("lvl", l.index)
+            return
+        }
+        if (l.index > cur) {
+            root.put("lvl", l.index)
+            levelUp = l
+        }
     }
 
     // ---------- settings ----------

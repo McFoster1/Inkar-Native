@@ -257,12 +257,12 @@ private sealed interface SDlg {
 
 private val TABS = listOf("overview", "chapters", "notes", "analytics")
 
-private fun safeName(name: String): String =
+fun safeName(name: String): String =
     name.replace(Regex("[\\\\/:*?\"<>|]+"), "").trim().take(80).ifEmpty { "chapter" }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBack: () -> Unit) {
+fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onWrite: (String) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     var dlg by remember { mutableStateOf<SDlg?>(null) }
     var reorder by remember { mutableStateOf(false) }
@@ -383,7 +383,7 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
                                     IconSq(R.drawable.ic_up, { repo.moveChapter(s.id, c.id, -1) }, enabled = i > 0)
                                     IconSq(R.drawable.ic_down, { repo.moveChapter(s.id, c.id, 1) }, enabled = i < s.chapters.lastIndex)
                                 } else {
-                                    Btn("Write", { toast(ctx, "The writing screen arrives in Phase 2") }, small = true)
+                                    Btn("Write", { onWrite(c.id) }, small = true)
                                     IconSq(R.drawable.ic_pen, { dlg = SDlg.RenCh(c.id, c.title) })
                                     IconSq(R.drawable.ic_dl, { export(s.title + " - " + c.title, c.title, repo.chapterContent(s.id, c.id)) })
                                     IconSq(R.drawable.ic_trash, { dlg = SDlg.DelCh(c.id, c.title, c.words) }, bad = true)
@@ -497,7 +497,7 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
                                         Txt(metaLine("${fmt(c.words)} words", ago(c.updatedAt)), 13f, InkMuted)
                                     }
                                     Spacer(Modifier.width(14.dp))
-                                    Btn("Write", { toast(ctx, "The writing screen arrives in Phase 2") }, small = true)
+                                    Btn("Write", { onWrite(c.id) }, small = true)
                                 }
                             }
                         }
@@ -522,9 +522,8 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
         }
         SDlg.NewCh -> NameDialog("New chapter", "Chapter title", "Chapter ${s.chapters.size + 1}", "Create", { dlg = null }) { t ->
             dlg = null
-            repo.createChapter(s.id, t)
-            onTab("chapters")
-            toast(ctx, "Chapter created")
+            val newId = repo.createChapter(s.id, t)
+            if (newId != null) onWrite(newId)
         }
         is SDlg.RenCh -> NameDialog("Rename chapter", "Chapter title", d.title, "Save", { dlg = null }) { t ->
             dlg = null
