@@ -9,14 +9,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import kotlinx.coroutines.delay
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.draw.clip
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -80,11 +72,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onPause() {
-        EditorHooks.flush?.invoke()
-        super.onPause()
-    }
-
     private fun applyBars(light: Boolean) {
         val style = if (light) SystemBarStyle.light(AColor.TRANSPARENT, AColor.TRANSPARENT) else SystemBarStyle.dark(AColor.TRANSPARENT)
         enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
@@ -93,144 +80,67 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun InkarApp(repo: Repo) {
-    val ctx = LocalContext.current
     var tab by rememberSaveable { mutableStateOf(0) }
     var openStory by rememberSaveable { mutableStateOf<String?>(null) }
     var storyTab by rememberSaveable { mutableStateOf("overview") }
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
     var newRequested by remember { mutableStateOf(false) }
-    var editing by rememberSaveable { mutableStateOf<String?>(null) }
-    var viewing by remember { mutableStateOf(false) }
     val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val levelUp = repo.levelUp
 
-    fun openEditor(sid: String, cid: String) {
-        viewing = false
-        editing = "$sid|$cid"
-        tab = 2
+    BackHandler(enabled = openStory != null || tab != 0) {
+        if (openStory != null) openStory = null else tab = 0
     }
 
-    fun leaveEditor(sid: String) {
-        viewing = false
-        editing = null
-        storyTab = "chapters"
-        openStory = sid
-        tab = 1
-    }
-
-    fun continueStory(s: StoryV) {
-        val c = s.chapters.maxByOrNull { it.updatedAt }
-        if (c != null) {
-            openEditor(s.id, c.id)
+    Column(Modifier.fillMaxSize().background(InkBg).statusBarsPadding().imePadding()) {
+        AppTopBar(repo)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (tab) {
+                0 -> HomeScreen(
+                    repo,
+                    onOpenStory = { id ->
+                        tab = 1
+                        storyTab = "overview"
+                        openStory = id
+                    },
+                    onNewStory = {
+                        openStory = null
+                        newRequested = true
+                        tab = 1
+                    },
+                )
+                1 -> {
+                    val id = openStory
+                    if (id == null) {
+                        StoriesPage(
+                            repo,
+                            query = query,
+                            onQuery = { query = it },
+                            filter = filter,
+                            onFilter = { filter = it },
+                            newRequested = newRequested,
+                            onNewHandled = { newRequested = false },
+                            onOpen = { sid ->
+                                storyTab = "overview"
+                                openStory = sid
+                            },
+                        )
+                    } else {
+                        StoryPage(repo, id, storyTab, onTab = { storyTab = it }, onBack = { openStory = null })
+                    }
+                }
+                2 -> ComingSoon("Write", "The writing screen arrives in Phase 2.")
+                3 -> ComingSoon("Stats", "Charts and statistics arrive in Phase 3.")
+                else -> MenuScreen(repo)
+            }
+        }
+        if (!imeOpen) {
+            BottomBar(tab) {
+                if (it == 1) openStory = null
+                tab = it
+            }
         } else {
-            storyTab = "overview"
-            openStory = s.id
-            tab = 1
-        }
-    }
-
-    BackHandler(enabled = editing != null || openStory != null || tab != 0) {
-        val e = editing
-        when {
-            e != null && viewing -> viewing = false
-            e != null -> leaveEditor(e.substringBefore('|'))
-            openStory != null -> openStory = null
-            else -> tab = 0
-        }
-    }
-
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().background(InkBg).statusBarsPadding().imePadding()) {
-            if (!viewing) AppTopBar(repo)
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                when (tab) {
-                    0 -> HomeScreen(
-                        repo,
-                        onContinue = { s -> continueStory(s) },
-                        onNewStory = {
-                            openStory = null
-                            newRequested = true
-                            tab = 1
-                        },
-                    )
-                    1 -> {
-                        val id = openStory
-                        if (id == null) {
-                            StoriesPage(
-                                repo,
-                                query = query,
-                                onQuery = { query = it },
-                                filter = filter,
-                                onFilter = { filter = it },
-                                newRequested = newRequested,
-                                onNewHandled = { newRequested = false },
-                                onOpen = { sid ->
-                                    storyTab = "overview"
-                                    openStory = sid
-                                },
-                            )
-                        } else {
-                            StoryPage(
-                                repo, id, storyTab,
-                                onTab = { storyTab = it },
-                                onWrite = { cid -> openEditor(id, cid) },
-                                onBack = { openStory = null },
-                            )
-                        }
-                    }
-                    2 -> {
-                        val e = editing
-                        if (e != null) {
-                            val sid = e.substringBefore('|')
-                            val cid = e.substringAfter('|')
-                            EditorScreen(repo, sid, cid, viewing, { viewing = it }, onBack = { leaveEditor(sid) })
-                        } else {
-                            LaunchedEffect(Unit) {
-                                val l = repo.lastChapter()
-                                if (l != null) {
-                                    openEditor(l.first, l.second)
-                                } else {
-                                    toast(ctx, "Create a story and chapter to start writing")
-                                    tab = 1
-                                }
-                            }
-                        }
-                    }
-                    3 -> ComingSoon("Stats", "Charts and statistics arrive in Phase 3.")
-                    else -> MenuScreen(repo)
-                }
-            }
-            if (!imeOpen && !viewing) {
-                BottomBar(tab) {
-                    if (it == 1) openStory = null
-                    if (it != 2) editing = null
-                    tab = it
-                }
-            } else {
-                Spacer(Modifier.navigationBarsPadding())
-            }
-        }
-
-        if (levelUp != null) {
-            LaunchedEffect(levelUp) {
-                delay(6000)
-                repo.dismissLevelUp()
-            }
-            val shape = RoundedCornerShape(14.dp)
-            Column(
-                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp, start = 12.dp, end = 12.dp)
-                    .widthIn(max = 360.dp).fillMaxWidth()
-                    .shadow(12.dp, shape, ambientColor = InkBlue, spotColor = InkBlue)
-                    .clip(shape).background(InkCard).border(1.dp, InkBlue, shape)
-                    .clickable { repo.dismissLevelUp() }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-            ) {
-                Txt("LEVEL UP!", 12f, InkBlue, FontWeight.Bold, spacing = 0.96f)
-                Txt("You've reached Level ${levelUp.index + 1}", 15f, InkText)
-                Txt(levelUp.title, 18f, InkText, FontWeight.Bold, modifier = Modifier.padding(vertical = 2.dp))
-                Txt("Your dedication to writing continues to grow.", 13f, InkDim)
-            }
+            Spacer(Modifier.navigationBarsPadding())
         }
     }
 }
