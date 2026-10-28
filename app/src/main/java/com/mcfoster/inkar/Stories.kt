@@ -317,7 +317,10 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Txt(s.title, 26f, InkText, FontWeight.SemiBold, spacing = -0.26f)
-                    Txt(s.genre, 13f, InkMuted)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Txt(s.genre, 13f, InkMuted)
+                        Pill(s.status)
+                    }
                     if (s.description.isNotBlank()) Txt(s.description, 15f, InkMuted)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Btn("+ New Chapter", { dlg = SDlg.NewCh }, primary = true)
@@ -475,10 +478,10 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onBa
 
                 else -> {
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        val stats = listOf("WORDS" to fmt(s.words), "CHAPTERS" to s.chapters.size.toString(), "STATUS" to s.status)
+                        val stats = listOf("WORDS" to fmt(s.words), "CHAPTERS" to s.chapters.size.toString())
                         for (row in stats.chunked(cols)) {
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                for ((label, value) in row) StatCard(label, value, Modifier.weight(1f), small = label == "STATUS")
+                                for ((label, value) in row) StatCard(label, value, Modifier.weight(1f))
                                 repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
