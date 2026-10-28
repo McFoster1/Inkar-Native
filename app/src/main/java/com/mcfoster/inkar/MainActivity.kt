@@ -10,7 +10,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,6 +38,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,7 +87,7 @@ private fun InkarApp(repo: Repo) {
                 null -> when (tab) {
                     0 -> HomeScreen(
                         repo,
-                        onStories = { tab = 1 },
+                        onOpenStory = { id -> tab = 1; stack.add(Screen.Detail(id)) },
                         onNewStory = { tab = 1; stack.add(Screen.Form(null)) },
                     )
                     1 -> StoriesScreen(
@@ -122,27 +127,36 @@ private fun InkarApp(repo: Repo) {
 @Composable
 private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
     val items = listOf(
-        "Home" to Ic.Home,
-        "Stories" to Ic.Book,
-        "Write" to Ic.Pen,
-        "Stats" to Ic.Bars,
-        "Menu" to Ic.Gear,
+        Triple("Home", R.drawable.ic_home_outline, R.drawable.ic_home_solid),
+        Triple("Stories", R.drawable.ic_stories_outline, R.drawable.ic_stories_solid),
+        Triple("Write", R.drawable.ic_write_outline, R.drawable.ic_write_solid),
+        Triple("Stats", R.drawable.ic_stats_outline, R.drawable.ic_stats_solid),
+        Triple("Menu", R.drawable.ic_menu_outline, R.drawable.ic_menu_solid),
     )
-    Row(Modifier.fillMaxWidth().background(InkNav).navigationBarsPadding().height(64.dp)) {
-        items.forEachIndexed { i, (label, ic) ->
-            val on = i == selected
-            val color = if (on) InkBlue else InkDim
-            Column(
-                Modifier.weight(1f).fillMaxHeight().clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onSelect(i) },
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                InkIcon(ic, color, 24.dp, filled = on)
-                Spacer(Modifier.height(3.dp))
-                Text(label, color = color, fontSize = 11.sp)
+    Column(Modifier.fillMaxWidth().background(InkCard)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(InkBorder))
+        Row(Modifier.fillMaxWidth().navigationBarsPadding()) {
+            items.forEachIndexed { i, (label, outline, solid) ->
+                val on = i == selected
+                val color = if (on) InkBlue else InkDim
+                val src = remember { MutableInteractionSource() }
+                val pressed by src.collectIsPressedAsState()
+                Column(
+                    Modifier.weight(1f)
+                        .heightIn(min = 54.dp)
+                        .graphicsLayer {
+                            alpha = if (pressed) 0.55f else 1f
+                            scaleX = if (pressed) 0.94f else 1f
+                            scaleY = if (pressed) 0.94f else 1f
+                        }
+                        .clickable(interactionSource = src, indication = null) { onSelect(i) }
+                        .padding(top = 8.dp, bottom = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    VecIcon(if (on) solid else outline, color, 24.dp)
+                    Txt(label, 11f, color, if (on) FontWeight.SemiBold else FontWeight.Normal, lh = 1.3f)
+                }
             }
         }
     }

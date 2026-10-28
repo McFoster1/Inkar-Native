@@ -41,6 +41,8 @@ data class StoryV(
     val words: Int get() = chapters.sumOf { it.words }
 }
 
+data class ChartDay(val date: LocalDate, val words: Map<String, Int>)
+
 class LevelInfo(
     val index: Int,
     val title: String,
@@ -449,6 +451,74 @@ class Repo private constructor(context: Context) {
         for (c in items) arr.put(c)
         s.put("chapters", arr)
         commit()
+    }
+
+    // ---------- home helpers ----------
+
+    fun chapterCount(): Int {
+        track()
+        return root.objs("stories").sumOf { it.objs("chapters").size }
+    }
+
+    fun bkDue(): Boolean {
+        track()
+        val every = root.optInt("bkEvery", 0)
+        val now = System.currentTimeMillis()
+        val last = root.optLong("lastExport", 0)
+        return every > 0 && now >= root.optLong("bkSnooze", 0) && lifeWords() >= 300 &&
+            (last == 0L || now - last > every * 86_400_000L)
+    }
+
+    fun bkLater() {
+        root.put("bkSnooze", System.currentTimeMillis() + 3 * 86_400_000L)
+        commit()
+    }
+
+    fun setGoal(g: Int) {
+        root.put("goal", maxOf(50, g))
+        commit()
+    }
+
+    /** Words per day for the last k days, split by story ("_old" = earlier writing). */
+    fun chartDays(k: Int): List<ChartDay> {
+        track()
+        val act = root.getJSONObject("activity")
+        val log = root.getJSONObject("log")
+        val owner = HashMap<String, String>()
+        for (s in root.objs("stories")) {
+            val sid = s.optString("id")
+            owner[sid] = sid
+            for (c in s.objs("chapters")) owner[c.optString("id")] = sid
+        }
+        val out = ArrayList<ChartDay>()
+        for (i in k - 1 downTo 0) {
+            val d = LocalDate.now().minusDays(i.toLong())
+            val key = d.toString()
+            val r = LinkedHashMap<String, Int>()
+            var t = 0
+            val l = log.optJSONObject(key)
+            if (l != null) {
+                for (id in l.keyList()) {
+                    val o = owner[id] ?: continue
+                    val w = l.optInt(id, 0)
+                    r[o] = (r[o] ?: 0) + w
+                    t += w
+                }
+            }
+            val extra = act.optInt(key, 0) - t
+            if (extra > 0) r["_old"] = extra
+            out.add(ChartDay(d, r))
+        }
+        return out
+    }
+
+    /** Title and colour for a chart series id. */
+    fun metaOf(id: String): Pair<String, String> {
+        track()
+        if (id == "_old") return "Earlier writing" to "#94A3B8"
+        val s = storyJson(id)
+        if (s != null) return s.optString("title", "") to s.optString("color", "#818CF8")
+        return "Deleted story" to "#94A3B8"
     }
 
     // ---------- settings ----------

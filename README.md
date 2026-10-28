@@ -10,4 +10,4 @@ Go to **Actions > Build Kotlin APK > Run workflow**, enter a version (for exampl
 
 ## Status
 
-Phase 1: bottom navigation, stories, chapters (create, rename, delete, reorder), covers, backup import and export (same file as the HTML app). Write and Stats tabs are placeholders.
+Phase 1.1: Home screen rebuilt to match the HTML app (header, backup banner, stats, writing chart, daily goal, recent stories) with the original navbar icons. Write and Stats tabs are placeholders.

@@ -46,66 +46,32 @@ import java.time.LocalDate
 import java.time.LocalTime
 import kotlin.concurrent.thread
 
-// ---------- Home ----------
+// ---------- Backup export (shared by Home and Menu) ----------
 
 @Composable
-fun HomeScreen(repo: Repo, onStories: () -> Unit, onNewStory: () -> Unit) {
-    val name = repo.name()
-    val hour = LocalTime.now().hour
-    val greet = when {
-        hour < 12 -> "Good morning"
-        hour < 18 -> "Good afternoon"
-        else -> "Good evening"
-    }
-    val goal = repo.goal()
-    val today = repo.todayWords()
-    val lv = repo.level()
-    val stories = repo.storyViews()
-
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Brand()
-        Text("$greet, $name", color = InkText, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-
-        Panel {
-            Text("TODAY", color = InkDim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
-            Spacer(Modifier.height(6.dp))
-            Text("${fmt(today)} / ${fmt(goal)} words", color = InkText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            Bar(today.toFloat() / goal)
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Tile("STREAK", "${repo.streak()} days", Modifier.weight(1f))
-            Tile("THIS WEEK", fmt(repo.weekWords()), Modifier.weight(1f))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Tile("TOTAL WORDS", fmt(stories.sumOf { it.words }), Modifier.weight(1f))
-            Tile("STORIES", stories.size.toString(), Modifier.weight(1f))
-        }
-
-        Panel {
-            Text("LEVEL ${lv.index + 1}", color = InkDim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
-            Spacer(Modifier.height(4.dp))
-            Text(lv.title, color = InkText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(10.dp))
-            Bar(lv.progress)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (lv.hasNext) "${fmt(lv.left)} words to level ${lv.index + 2}" else "Top level reached",
-                color = InkMuted,
-                fontSize = 13.sp,
-            )
-        }
-
-        if (stories.isEmpty()) {
-            PrimaryButton("Create your first story", onNewStory, Modifier.fillMaxWidth())
-        } else {
-            GhostButton("Open stories", onStories, Modifier.fillMaxWidth())
+fun rememberBackupExporter(repo: Repo): () -> Unit {
+    val ctx = LocalContext.current
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        if (uri != null) {
+            val bytes = repo.exportJson().toByteArray()
+            thread {
+                val ok = try {
+                    ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) } != null
+                } catch (e: Exception) {
+                    false
+                }
+                onMain {
+                    if (ok) {
+                        repo.markExported()
+                        toast(ctx, "Backup saved")
+                    } else {
+                        toast(ctx, "Could not save the backup")
+                    }
+                }
+            }
         }
     }
+    return { pick.launch("inkar-backup-${LocalDate.now()}.json") }
 }
 
 // ---------- Stories list ----------
@@ -410,26 +376,7 @@ fun MenuScreen(repo: Repo) {
         }
     }
 
-    val exportPick = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
-        if (uri != null) {
-            val bytes = repo.exportJson().toByteArray()
-            thread {
-                val ok = try {
-                    ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(bytes) } != null
-                } catch (e: Exception) {
-                    false
-                }
-                onMain {
-                    if (ok) {
-                        repo.markExported()
-                        toast(ctx, "Backup saved")
-                    } else {
-                        toast(ctx, "Could not save the backup")
-                    }
-                }
-            }
-        }
-    }
+    val exportBackup = rememberBackupExporter(repo)
 
     Column(Modifier.fillMaxSize()) {
         TopBar("Menu")
@@ -465,7 +412,7 @@ fun MenuScreen(repo: Repo) {
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GhostButton("Import", { importPick.launch(arrayOf("*/*")) }, Modifier.weight(1f))
-                    PrimaryButton("Export", { exportPick.launch("inkar-backup-${LocalDate.now()}.json") }, Modifier.weight(1f))
+                    PrimaryButton("Export", exportBackup, Modifier.weight(1f))
                 }
             }
 

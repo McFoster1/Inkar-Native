@@ -67,17 +67,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
 val InkBlue = Color(0xFF2563EB)
 val InkBg = Color(0xFF0B0D10)
-val InkCard = Color(0xFF14181F)
-val InkNav = Color(0xFF10141A)
-val InkBorder = Color(0xFF232A34)
-val InkText = Color(0xFFEDEFF3)
-val InkMuted = Color(0xFF9AA4B2)
-val InkDim = Color(0xFF6B7380)
-val InkBad = Color(0xFFF87171)
+val InkCard = Color(0xFF13161B)
+val InkNav = InkCard
+val InkBorder = Color(0x14FFFFFF)
+val InkText = Color(0xF2FFFFFF)
+val InkMuted = Color(0xA6FFFFFF)
+val InkDim = Color(0x61FFFFFF)
+val InkBad = Color(0xFFEF4444)
 
 val InkarColors = darkColorScheme(
     primary = InkBlue,
@@ -186,13 +187,14 @@ fun InkIcon(ic: Ic, tint: Color, size: Dp = 24.dp, filled: Boolean = false, cut:
 // ---------- building blocks ----------
 
 @Composable
-fun Brand(sizeSp: Int = 26) {
+fun Brand(sizeSp: Int = 18) {
     Text(
         text = buildAnnotatedString {
-            withStyle(SpanStyle(color = Color.White)) { append("INK") }
+            withStyle(SpanStyle(color = InkText)) { append("INK") }
             withStyle(SpanStyle(color = InkBlue)) { append("AR") }
         },
         fontSize = sizeSp.sp,
+        letterSpacing = 0.02.em,
         fontWeight = FontWeight.Bold,
     )
 }
@@ -231,10 +233,10 @@ fun TopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable Row
 fun Panel(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    padding: Dp = 16.dp,
+    padding: Dp = 18.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(12.dp)
     var m = modifier.fillMaxWidth().clip(shape).background(InkCard).border(1.dp, InkBorder, shape)
     if (onClick != null) m = m.clickable(onClick = onClick)
     Column(m.padding(padding), content = content)
@@ -388,7 +390,7 @@ private fun decodeCover(data: String): ImageBitmap? {
 @Composable
 fun CoverImage(cover: String?, letter: String, colorHex: String, width: Dp, height: Dp) {
     val bmp = remember(cover) { cover?.let { decodeCover(it) } }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(8.dp)
     if (bmp != null) {
         Image(
             bitmap = bmp,
@@ -397,19 +399,14 @@ fun CoverImage(cover: String?, letter: String, colorHex: String, width: Dp, heig
             modifier = Modifier.size(width, height).clip(shape),
         )
     } else {
-        val c = try {
-            Color(android.graphics.Color.parseColor(colorHex))
-        } catch (e: Exception) {
-            InkBlue
-        }
         Box(
-            Modifier.size(width, height).clip(shape).background(c.copy(alpha = 0.2f)).border(1.dp, c.copy(alpha = 0.5f), shape),
+            Modifier.size(width, height).clip(shape).background(Color(0xFF1A1E25)).border(1.dp, InkBorder, shape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 letter.trim().take(1).uppercase().ifEmpty { "?" },
-                color = c,
-                fontSize = (height.value / 2.4f).sp,
+                color = InkDim,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
