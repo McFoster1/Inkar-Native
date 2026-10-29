@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -239,28 +240,70 @@ fun toHtml(text: String, styles: ByteArray): String {
     return out.toString()
 }
 
-private fun styledTransform(styles: ByteArray) = VisualTransformation { text ->
-    if (styles.size != text.length) {
+/**
+ * Shows bold/italic and adds a small gap after every line break. The gap is only drawn: the stored text
+ * keeps a single line break, so word counts, exports and backups are unaffected.
+ */
+private fun paragraphTransform(styles: ByteArray, gapSp: Float) = VisualTransformation { text ->
+    val src = text.text
+    val n = src.length
+    if (styles.size != n) {
         TransformedText(text, OffsetMapping.Identity)
     } else {
-        val b = AnnotatedString.Builder(text)
+        var nl = 0
+        for (ch in src) if (ch == '\n') nl++
+        val tn = n + 2 * nl
+        val sb = StringBuilder(tn)
+        val o2t = IntArray(n + 1)
+        val t2o = IntArray(tn + 1)
+        val spacers = ArrayList<Int>()
+        var d = 0
+        for (i in 0 until n) {
+            o2t[i] = d
+            t2o[d] = i
+            val ch = src[i]
+            sb.append(ch)
+            d++
+            if (ch == '\n') {
+                t2o[d] = i + 1
+                sb.append('\u200B')
+                spacers.add(d)
+                d++
+                t2o[d] = i + 1
+                sb.append('\n')
+                d++
+            }
+        }
+        o2t[n] = d
+        t2o[d] = n
+        val b = AnnotatedString.Builder(sb.toString())
         var i = 0
-        while (i < styles.size) {
+        while (i < n) {
             val v = styles[i].toInt()
             var j = i + 1
-            while (j < styles.size && styles[j].toInt() == v) j++
+            while (j < n && styles[j].toInt() == v) j++
             if (v != 0) {
                 b.addStyle(
                     SpanStyle(
                         fontWeight = if ((v and BOLD) != 0) FontWeight.Bold else null,
                         fontStyle = if ((v and ITALIC) != 0) FontStyle.Italic else null,
                     ),
-                    i, j,
+                    o2t[i], o2t[j],
                 )
             }
             i = j
         }
-        TransformedText(b.toAnnotatedString(), OffsetMapping.Identity)
+        for (sp in spacers) {
+            b.addStyle(SpanStyle(fontSize = 2.sp), sp, sp + 1)
+            b.addStyle(ParagraphStyle(lineHeight = gapSp.sp), sp, sp + 2)
+        }
+        TransformedText(
+            b.toAnnotatedString(),
+            object : OffsetMapping {
+                override fun originalToTransformed(offset: Int): Int = o2t[offset.coerceIn(0, n)]
+                override fun transformedToOriginal(offset: Int): Int = t2o[offset.coerceIn(0, tn)]
+            },
+        )
     }
 }
 
@@ -352,6 +395,54 @@ private class RichState(text: String, initialStyles: ByteArray) {
         styles = ns
         styleVer++
         dirty++
+    }
+
+    /** Removes empty lines (and lines of only spaces) so each paragraph is one line break. Returns false if nothing changed. */
+    fun tidy(): Boolean {
+        val t = value.text
+        val n = t.length
+        val starts = ArrayList<Int>()
+        val ends = ArrayList<Int>()
+        var st = 0
+        while (true) {
+            val nl = t.indexOf('\n', st)
+            val e = if (nl < 0) n else nl
+            starts.add(st)
+            ends.add(e)
+            if (nl < 0) break
+            st = nl + 1
+        }
+        var last = -1
+        for (k in starts.indices) if (t.substring(starts[k], ends[k]).isNotBlank()) last = k
+        val keep = BooleanArray(n)
+        for (k in starts.indices) {
+            val blank = t.substring(starts[k], ends[k]).isBlank()
+            if (!blank) {
+                for (x in starts[k] until ends[k]) keep[x] = true
+                if (k < last && ends[k] < n) keep[ends[k]] = true
+            }
+        }
+        val o2n = IntArray(n + 1)
+        val out = StringBuilder()
+        val outSt = ArrayList<Byte>()
+        for (x in 0 until n) {
+            o2n[x] = out.length
+            if (keep[x]) {
+                out.append(t[x])
+                outSt.add(styles[x])
+            }
+        }
+        o2n[n] = out.length
+        val nt = out.toString()
+        if (nt == t) return false
+        push(value, true)
+        styles = ByteArray(nt.length) { outSt[it] }
+        val sel = value.selection
+        value = TextFieldValue(nt, TextRange(o2n[sel.start.coerceIn(0, n)], o2n[sel.end.coerceIn(0, n)]))
+        pending = null
+        styleVer++
+        dirty++
+        return true
     }
 
     /** Style flags at the cursor (or at the start of the selection). */
@@ -471,7 +562,7 @@ private fun EditorBody(
 
     val fam = remember(font) { editorFamily(font) }
     val bodyStyle = TextStyle(fontFamily = fam, fontSize = size.sp, lineHeight = (size * 1.75f).sp, color = InkText)
-    val vt = remember(rs.styleVer) { styledTransform(rs.styles) }
+    val vt = remember(rs.styleVer, size) { paragraphTransform(rs.styles, size * 0.6f) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(sid, cid) {
         if (rs.value.text.isBlank() && !viewing) {
@@ -543,12 +634,15 @@ private fun EditorBody(
                                     onDismissRequest = { showFp = false },
                                     properties = PopupProperties(focusable = true),
                                 ) {
-                                    FontPanel(font, size, onFont = {
+                                    FontPanel(font, size, canTidy = !viewing, onFont = {
                                         font = it
                                         repo.setEditorFont(it)
                                     }, onSize = { size = it }, onSizeDone = { repo.setEditorSize(size) }, onReset = {
                                         size = 16
                                         repo.setEditorSize(16)
+                                    }, onTidy = {
+                                        showFp = false
+                                        toast(ctx, if (rs.tidy()) "Blank lines removed" else "Nothing to tidy")
                                     })
                                 }
                             }
@@ -618,7 +712,7 @@ private fun TbIcon(icon: Int, enabled: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun FontPanel(font: String, size: Int, onFont: (String) -> Unit, onSize: (Int) -> Unit, onSizeDone: () -> Unit, onReset: () -> Unit) {
+private fun FontPanel(font: String, size: Int, canTidy: Boolean, onFont: (String) -> Unit, onSize: (Int) -> Unit, onSizeDone: () -> Unit, onReset: () -> Unit, onTidy: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Column(
         Modifier.width(300.dp).shadow(12.dp, shape).clip(shape).background(InkCard).border(1.dp, InkBorder, shape).padding(14.dp),
@@ -648,5 +742,12 @@ private fun FontPanel(font: String, size: Int, onFont: (String) -> Unit, onSize:
             colors = SliderDefaults.colors(thumbColor = InkBlue, activeTrackColor = InkBlue, inactiveTrackColor = InkEl),
         )
         Btn("Reset size", onReset, small = true)
+        if (canTidy) {
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(InkBorder))
+            Spacer(Modifier.height(10.dp))
+            Btn("Tidy blank lines", onTidy, small = true)
+            Txt("Removes empty lines between paragraphs. Undo brings them back.", 12f, InkDim, modifier = Modifier.padding(top = 6.dp), lh = 1.4f)
+        }
     }
 }

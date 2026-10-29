@@ -1,6 +1,8 @@
 package com.mcfoster.inkar
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -21,6 +23,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -52,17 +56,52 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
-/** Top bar shown on every tab: logo, search and theme buttons (both inactive for now). */
+class NavDef(val short: String, val long: String, @DrawableRes val outline: Int, @DrawableRes val solid: Int)
+
+val NAV_DEFS = listOf(
+    NavDef("Home", "Overview", R.drawable.ic_home_outline, R.drawable.ic_home_solid),
+    NavDef("Stories", "My Stories", R.drawable.ic_stories_outline, R.drawable.ic_stories_solid),
+    NavDef("Write", "Writing", R.drawable.ic_write_outline, R.drawable.ic_write_solid),
+    NavDef("Stats", "Analytics", R.drawable.ic_stats_outline, R.drawable.ic_stats_solid),
+    NavDef("Menu", "Settings", R.drawable.ic_menu_outline, R.drawable.ic_menu_solid),
+)
+
+/** Top bar shown on every tab: logo, search and theme buttons, plus the main navigation on wide screens. */
 @Composable
-fun AppTopBar(repo: Repo) {
+fun AppTopBar(repo: Repo, showNav: Boolean, selected: Int, onSelect: (Int) -> Unit) {
     val ctx = LocalContext.current
     Column {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Brand(18)
+            if (showNav) {
+                Spacer(Modifier.width(20.dp))
+                Row(
+                    Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    NAV_DEFS.forEachIndexed { i, d ->
+                        val on = i == selected
+                        Row(
+                            Modifier.clip(RoundedCornerShape(10.dp))
+                                .background(if (on) InkEl else Color.Transparent)
+                                .clickable { onSelect(i) }
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            VecIcon(if (on) d.solid else d.outline, if (on) InkText else InkMuted, 22.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Txt(d.long, 15f, if (on) InkText else InkMuted, FontWeight.Medium, lh = 1.3f, maxLines = 1)
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 SquareIconBtn(R.drawable.ic_search) { toast(ctx, "Search arrives in a later phase") }
                 Btn("◐ Theme", { repo.setTheme(if (Theme.isLight) "dark" else "light") }, small = true)

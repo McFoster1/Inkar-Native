@@ -432,9 +432,8 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onWr
                     val avg = if (s.chapters.isEmpty()) 0 else Math.round(s.words.toDouble() / s.chapters.size).toInt()
                     val longest = s.chapters.maxOfOrNull { it.words } ?: 0
                     val stats = listOf(
-                        "AVG WORDS / CHAPTER" to fmt(avg),
-                        "MOST WORDS / CHAPTER" to fmt(longest),
-                        "LAST 7 DAYS" to fmt(repo.last7(s.id)),
+                        "AVG WORDS / CHAP" to fmt(avg),
+                        "MOST WORDS / CHAP" to fmt(longest),
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         for (row in stats.chunked(cols)) {

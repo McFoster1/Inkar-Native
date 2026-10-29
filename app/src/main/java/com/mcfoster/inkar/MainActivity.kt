@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
@@ -104,6 +105,13 @@ private fun InkarApp(repo: Repo) {
     var viewing by remember { mutableStateOf(false) }
     val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val levelUp = repo.levelUp
+    val wide = LocalConfiguration.current.screenWidthDp >= 600
+
+    fun selectTab(i: Int) {
+        if (i == 1) openStory = null
+        if (i != 2) editing = null
+        tab = i
+    }
 
     fun openEditor(sid: String, cid: String) {
         viewing = false
@@ -142,7 +150,7 @@ private fun InkarApp(repo: Repo) {
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(InkBg).statusBarsPadding().imePadding()) {
-            if (!viewing) AppTopBar(repo)
+            if (!viewing) AppTopBar(repo, showNav = wide && editing == null, selected = tab, onSelect = { selectTab(it) })
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (tab) {
                     0 -> HomeScreen(
@@ -201,12 +209,8 @@ private fun InkarApp(repo: Repo) {
                     else -> MenuScreen(repo)
                 }
             }
-            if (!imeOpen && !viewing) {
-                BottomBar(tab) {
-                    if (it == 1) openStory = null
-                    if (it != 2) editing = null
-                    tab = it
-                }
+            if (!wide && !imeOpen && !viewing && editing == null) {
+                BottomBar(tab) { selectTab(it) }
             } else {
                 Spacer(Modifier.navigationBarsPadding())
             }
@@ -237,17 +241,10 @@ private fun InkarApp(repo: Repo) {
 
 @Composable
 private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
-    val items = listOf(
-        Triple("Home", R.drawable.ic_home_outline, R.drawable.ic_home_solid),
-        Triple("Stories", R.drawable.ic_stories_outline, R.drawable.ic_stories_solid),
-        Triple("Write", R.drawable.ic_write_outline, R.drawable.ic_write_solid),
-        Triple("Stats", R.drawable.ic_stats_outline, R.drawable.ic_stats_solid),
-        Triple("Menu", R.drawable.ic_menu_outline, R.drawable.ic_menu_solid),
-    )
     Column(Modifier.fillMaxWidth().background(InkCard)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(InkBorder))
         Row(Modifier.fillMaxWidth().navigationBarsPadding()) {
-            items.forEachIndexed { i, (label, outline, solid) ->
+            NAV_DEFS.forEachIndexed { i, d ->
                 val on = i == selected
                 val color = if (on) InkBlue else InkDim
                 val src = remember { MutableInteractionSource() }
@@ -265,8 +262,8 @@ private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    VecIcon(if (on) solid else outline, color, 24.dp)
-                    Txt(label, 11f, color, if (on) FontWeight.SemiBold else FontWeight.Normal, lh = 1.3f)
+                    VecIcon(if (on) d.solid else d.outline, color, 24.dp)
+                    Txt(d.short, 11f, color, if (on) FontWeight.SemiBold else FontWeight.Normal, lh = 1.3f)
                 }
             }
         }

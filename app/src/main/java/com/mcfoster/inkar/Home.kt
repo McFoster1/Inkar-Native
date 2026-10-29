@@ -58,7 +58,7 @@ fun HomeScreen(repo: Repo, onContinue: (StoryV) -> Unit, onNewStory: () -> Unit)
         hour < 18 -> "Good afternoon"
         else -> "Good evening"
     }
-    val cols = if (LocalConfiguration.current.screenWidthDp >= 514) 3 else 2
+    val cols = if (LocalConfiguration.current.screenWidthDp >= 700) 4 else 2
 
     Column(Modifier.fillMaxSize()) {
 
@@ -121,6 +121,7 @@ fun HomeScreen(repo: Repo, onContinue: (StoryV) -> Unit, onNewStory: () -> Unit)
                     "WORDS TODAY" to fmt(today),
                     "CHAPTERS" to fmt(chapters),
                     "WRITING STREAK" to "$streak ${if (streak == 1) "day" else "days"}",
+                    "AVG / DAY" to fmt(Math.round(week / 7.0).toInt()),
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     for (row in stats.chunked(cols)) {

@@ -161,7 +161,6 @@ fun MenuScreen(repo: Repo) {
         HCard {
             Txt("About", 18f, InkText, FontWeight.Bold)
             Txt("Inkar-Native · version $version", 15f, InkMuted, modifier = Modifier.padding(top = 4.dp))
-            Txt("Phase 1: stories, chapters and backup", 13f, InkDim)
         }
     }
 
