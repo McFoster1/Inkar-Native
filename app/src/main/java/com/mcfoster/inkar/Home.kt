@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalTime
 
 @Composable
-fun HomeScreen(repo: Repo, onOpenStory: (String) -> Unit, onNewStory: () -> Unit) {
+fun HomeScreen(repo: Repo, onContinue: (StoryV) -> Unit, onNewStory: () -> Unit) {
     val ctx = LocalContext.current
     val exportBackup = rememberBackupExporter(repo)
     val name = repo.name()
@@ -177,7 +177,7 @@ fun HomeScreen(repo: Repo, onOpenStory: (String) -> Unit, onNewStory: () -> Unit
                                 Txt(metaLine(s.genre, "${fmt(s.words)} words", "${s.chapters.size} ch", ago(s.updatedAt)), 13f, InkMuted)
                             }
                             Spacer(Modifier.width(8.dp))
-                            Btn("Continue", { onOpenStory(s.id) }, small = true)
+                            Btn("Continue", { onContinue(s) }, small = true)
                         }
                     }
                 }
