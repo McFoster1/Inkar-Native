@@ -10,4 +10,4 @@ Go to **Actions > Build Kotlin APK > Run workflow**, enter a version (for exampl
 
 ## Status
 
-Phase 2.1: paragraph gap and Tidy blank lines in the editor, nav hidden while writing, landscape top navigation, AVG / DAY card, Analytics label changes. Stats tab is still a placeholder.
+Phase 2.2: smaller paragraph gap, stronger Tidy blank lines plus Tidy all chapters, centred landscape nav, animated bars and a smoother Write tab. Stats tab is still a placeholder.

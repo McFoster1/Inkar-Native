@@ -8,6 +8,13 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalConfiguration
@@ -107,12 +114,6 @@ private fun InkarApp(repo: Repo) {
     val levelUp = repo.levelUp
     val wide = LocalConfiguration.current.screenWidthDp >= 600
 
-    fun selectTab(i: Int) {
-        if (i == 1) openStory = null
-        if (i != 2) editing = null
-        tab = i
-    }
-
     fun openEditor(sid: String, cid: String) {
         viewing = false
         editing = "$sid|$cid"
@@ -138,6 +139,21 @@ private fun InkarApp(repo: Repo) {
         }
     }
 
+    fun selectTab(i: Int) {
+        if (i == 2) {
+            if (editing != null) {
+                tab = 2
+                return
+            }
+            val l = repo.lastChapter()
+            if (l != null) openEditor(l.first, l.second) else toast(ctx, "Create a story and chapter to start writing")
+            return
+        }
+        if (i == 1) openStory = null
+        editing = null
+        tab = i
+    }
+
     BackHandler(enabled = editing != null || openStory != null || tab != 0) {
         val e = editing
         when {
@@ -150,7 +166,13 @@ private fun InkarApp(repo: Repo) {
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(InkBg).statusBarsPadding().imePadding()) {
-            if (!viewing) AppTopBar(repo, showNav = wide && editing == null, selected = tab, onSelect = { selectTab(it) })
+            AnimatedVisibility(
+                visible = !viewing,
+                enter = fadeIn(tween(200)) + expandVertically(tween(200), expandFrom = Alignment.Top),
+                exit = fadeOut(tween(200)) + shrinkVertically(tween(200), shrinkTowards = Alignment.Top),
+            ) {
+                AppTopBar(repo, showNav = wide && editing == null, selected = tab, onSelect = { selectTab(it) })
+            }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (tab) {
                     0 -> HomeScreen(
@@ -209,11 +231,16 @@ private fun InkarApp(repo: Repo) {
                     else -> MenuScreen(repo)
                 }
             }
-            if (!wide && !imeOpen && !viewing && editing == null) {
+            val showBottom = !wide && !imeOpen && !viewing && editing == null
+            AnimatedVisibility(
+                visible = showBottom,
+                enter = fadeIn(tween(200)) + expandVertically(tween(200), expandFrom = Alignment.Bottom),
+                exit = fadeOut(tween(200)) + shrinkVertically(tween(200), shrinkTowards = Alignment.Bottom),
+            ) {
                 BottomBar(tab) { selectTab(it) }
-            } else {
-                Spacer(Modifier.navigationBarsPadding())
             }
+            val inset by animateColorAsState(if (showBottom) InkCard else InkBg, tween(200), label = "inset")
+            Box(Modifier.fillMaxWidth().background(inset).navigationBarsPadding())
         }
 
         if (levelUp != null) {
@@ -243,7 +270,7 @@ private fun InkarApp(repo: Repo) {
 private fun BottomBar(selected: Int, onSelect: (Int) -> Unit) {
     Column(Modifier.fillMaxWidth().background(InkCard)) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(InkBorder))
-        Row(Modifier.fillMaxWidth().navigationBarsPadding()) {
+        Row(Modifier.fillMaxWidth()) {
             NAV_DEFS.forEachIndexed { i, d ->
                 val on = i == selected
                 val color = if (on) InkBlue else InkDim

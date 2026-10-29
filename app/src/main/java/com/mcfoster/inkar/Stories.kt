@@ -253,6 +253,7 @@ private sealed interface SDlg {
     data object NewNote : SDlg
     data class EditNote(val nid: String) : SDlg
     data class DelNote(val nid: String, val title: String) : SDlg
+    data object TidyAll : SDlg
 }
 
 private val TABS = listOf("overview", "chapters", "notes", "analytics")
@@ -362,6 +363,8 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onWr
                     }
                     if (s.chapters.isEmpty()) {
                         Txt("No chapters yet. Add your first one.", 15f, InkMuted, modifier = Modifier.padding(top = 8.dp))
+                    } else {
+                        Btn("Tidy all chapters", { dlg = SDlg.TidyAll }, Modifier.padding(top = 12.dp), small = true)
                     }
                     for ((i, c) in s.chapters.withIndex()) {
                         if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(InkBorder))
@@ -545,6 +548,17 @@ fun StoryPage(repo: Repo, id: String, tab: String, onTab: (String) -> Unit, onWr
         is SDlg.EditNote -> NoteDialog(s.notes.firstOrNull { it.id == d.nid }, { dlg = null }) { t, c, x ->
             dlg = null
             repo.updateNote(s.id, d.nid, t, c, x)
+        }
+        SDlg.TidyAll -> ConfirmModal(
+            "Tidy all chapters?",
+            "Removes empty lines between paragraphs in every chapter of this story. Your words and stats stay the same. This can't be undone, so export a backup first if you want a safety copy.",
+            "Tidy all",
+            { dlg = null },
+            danger = false,
+        ) {
+            dlg = null
+            val n = repo.tidyAll(s.id)
+            toast(ctx, if (n > 0) "$n chapter${if (n == 1) "" else "s"} tidied" else "Nothing to tidy")
         }
         is SDlg.DelNote -> ConfirmModal(
             "Delete this note?",

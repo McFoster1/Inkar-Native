@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.TransformedText
@@ -240,9 +241,12 @@ fun toHtml(text: String, styles: ByteArray): String {
     return out.toString()
 }
 
+private val NO_TRIM = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
+
 /**
- * Shows bold/italic and adds a small gap after every line break. The gap is only drawn: the stored text
- * keeps a single line break, so word counts, exports and backups are unaffected.
+ * Shows bold/italic and a small gap between paragraphs. Each line break is drawn as its own tiny paragraph
+ * (same length as the text, so the cursor maps 1:1). The stored text keeps a single line break, so word counts,
+ * exports and backups are unaffected. A line break at the very end stays a normal line so the cursor has room.
  */
 private fun paragraphTransform(styles: ByteArray, gapSp: Float) = VisualTransformation { text ->
     val src = text.text
@@ -250,33 +254,10 @@ private fun paragraphTransform(styles: ByteArray, gapSp: Float) = VisualTransfor
     if (styles.size != n) {
         TransformedText(text, OffsetMapping.Identity)
     } else {
-        var nl = 0
-        for (ch in src) if (ch == '\n') nl++
-        val tn = n + 2 * nl
-        val sb = StringBuilder(tn)
-        val o2t = IntArray(n + 1)
-        val t2o = IntArray(tn + 1)
-        val spacers = ArrayList<Int>()
-        var d = 0
-        for (i in 0 until n) {
-            o2t[i] = d
-            t2o[d] = i
-            val ch = src[i]
-            sb.append(ch)
-            d++
-            if (ch == '\n') {
-                t2o[d] = i + 1
-                sb.append('\u200B')
-                spacers.add(d)
-                d++
-                t2o[d] = i + 1
-                sb.append('\n')
-                d++
-            }
-        }
-        o2t[n] = d
-        t2o[d] = n
-        val b = AnnotatedString.Builder(sb.toString())
+        val lastNl = if (n > 0 && src[n - 1] == '\n') n - 1 else -1
+        val chars = src.toCharArray()
+        for (i in 0 until n) if (chars[i] == '\n' && i != lastNl) chars[i] = '\u200B'
+        val b = AnnotatedString.Builder(String(chars))
         var i = 0
         while (i < n) {
             val v = styles[i].toInt()
@@ -288,23 +269,78 @@ private fun paragraphTransform(styles: ByteArray, gapSp: Float) = VisualTransfor
                         fontWeight = if ((v and BOLD) != 0) FontWeight.Bold else null,
                         fontStyle = if ((v and ITALIC) != 0) FontStyle.Italic else null,
                     ),
-                    o2t[i], o2t[j],
+                    i, j,
                 )
             }
             i = j
         }
-        for (sp in spacers) {
-            b.addStyle(SpanStyle(fontSize = 2.sp), sp, sp + 1)
-            b.addStyle(ParagraphStyle(lineHeight = gapSp.sp), sp, sp + 2)
+        for (k in 0 until n) {
+            if (src[k] == '\n' && k != lastNl) {
+                b.addStyle(SpanStyle(fontSize = 2.sp), k, k + 1)
+                b.addStyle(ParagraphStyle(lineHeight = gapSp.sp, lineHeightStyle = NO_TRIM), k, k + 1)
+            }
         }
-        TransformedText(
-            b.toAnnotatedString(),
-            object : OffsetMapping {
-                override fun originalToTransformed(offset: Int): Int = o2t[offset.coerceIn(0, n)]
-                override fun transformedToOriginal(offset: Int): Int = t2o[offset.coerceIn(0, tn)]
-            },
-        )
+        TransformedText(b.toAnnotatedString(), OffsetMapping.Identity)
     }
+}
+
+// ======================= tidy blank lines =======================
+
+private fun invisible(c: Char): Boolean {
+    if (c.isWhitespace() || c == '\u00A0' || c == '\u3164' || c == '\u115F' || c == '\u1160' || c == '\u2800' || c == '\u180E') return true
+    val t = Character.getType(c)
+    return t == Character.FORMAT.toInt() || t == Character.CONTROL.toInt() ||
+        t == Character.NON_SPACING_MARK.toInt() || t == Character.ENCLOSING_MARK.toInt()
+}
+
+private fun blankLine(t: String, a: Int, b: Int): Boolean {
+    for (k in a until b) if (!invisible(t[k])) return false
+    return true
+}
+
+class Tidied(val text: String, val styles: ByteArray, val o2n: IntArray, val removed: Int)
+
+/** Drops every empty (or invisible-only) line so each paragraph is one line break. Null if nothing changes. */
+fun tidyText(t: String, styles: ByteArray): Tidied? {
+    val n = t.length
+    val starts = ArrayList<Int>()
+    val ends = ArrayList<Int>()
+    var st = 0
+    while (true) {
+        val nl = t.indexOf('\n', st)
+        val e = if (nl < 0) n else nl
+        starts.add(st)
+        ends.add(e)
+        if (nl < 0) break
+        st = nl + 1
+    }
+    val blank = BooleanArray(starts.size) { blankLine(t, starts[it], ends[it]) }
+    var last = -1
+    for (k in blank.indices) if (!blank[k]) last = k
+    val keep = BooleanArray(n)
+    var removed = 0
+    for (k in starts.indices) {
+        if (blank[k]) {
+            removed++
+            continue
+        }
+        for (x in starts[k] until ends[k]) keep[x] = true
+        if (k < last && ends[k] < n) keep[ends[k]] = true
+    }
+    val o2n = IntArray(n + 1)
+    val out = StringBuilder()
+    val outSt = ArrayList<Byte>()
+    for (x in 0 until n) {
+        o2n[x] = out.length
+        if (keep[x]) {
+            out.append(t[x])
+            outSt.add(styles[x])
+        }
+    }
+    o2n[n] = out.length
+    val nt = out.toString()
+    if (nt == t) return null
+    return Tidied(nt, ByteArray(nt.length) { outSt[it] }, o2n, removed)
 }
 
 // ======================= editor state (text, styles, undo/redo) =======================
@@ -397,52 +433,18 @@ private class RichState(text: String, initialStyles: ByteArray) {
         dirty++
     }
 
-    /** Removes empty lines (and lines of only spaces) so each paragraph is one line break. Returns false if nothing changed. */
-    fun tidy(): Boolean {
-        val t = value.text
-        val n = t.length
-        val starts = ArrayList<Int>()
-        val ends = ArrayList<Int>()
-        var st = 0
-        while (true) {
-            val nl = t.indexOf('\n', st)
-            val e = if (nl < 0) n else nl
-            starts.add(st)
-            ends.add(e)
-            if (nl < 0) break
-            st = nl + 1
-        }
-        var last = -1
-        for (k in starts.indices) if (t.substring(starts[k], ends[k]).isNotBlank()) last = k
-        val keep = BooleanArray(n)
-        for (k in starts.indices) {
-            val blank = t.substring(starts[k], ends[k]).isBlank()
-            if (!blank) {
-                for (x in starts[k] until ends[k]) keep[x] = true
-                if (k < last && ends[k] < n) keep[ends[k]] = true
-            }
-        }
-        val o2n = IntArray(n + 1)
-        val out = StringBuilder()
-        val outSt = ArrayList<Byte>()
-        for (x in 0 until n) {
-            o2n[x] = out.length
-            if (keep[x]) {
-                out.append(t[x])
-                outSt.add(styles[x])
-            }
-        }
-        o2n[n] = out.length
-        val nt = out.toString()
-        if (nt == t) return false
+    /** Removes empty lines. Returns how many were removed (0 = nothing to tidy). */
+    fun tidy(): Int {
+        val r = tidyText(value.text, styles) ?: return 0
         push(value, true)
-        styles = ByteArray(nt.length) { outSt[it] }
+        val n = value.text.length
         val sel = value.selection
-        value = TextFieldValue(nt, TextRange(o2n[sel.start.coerceIn(0, n)], o2n[sel.end.coerceIn(0, n)]))
+        styles = r.styles
+        value = TextFieldValue(r.text, TextRange(r.o2n[sel.start.coerceIn(0, n)], r.o2n[sel.end.coerceIn(0, n)]))
         pending = null
         styleVer++
         dirty++
-        return true
+        return r.removed
     }
 
     /** Style flags at the cursor (or at the start of the selection). */
@@ -561,8 +563,8 @@ private fun EditorBody(
     }
 
     val fam = remember(font) { editorFamily(font) }
-    val bodyStyle = TextStyle(fontFamily = fam, fontSize = size.sp, lineHeight = (size * 1.75f).sp, color = InkText)
-    val vt = remember(rs.styleVer, size) { paragraphTransform(rs.styles, size * 0.6f) }
+    val bodyStyle = TextStyle(fontFamily = fam, fontSize = size.sp, lineHeight = (size * 1.75f).sp, lineHeightStyle = NO_TRIM, color = InkText)
+    val vt = remember(rs.styleVer, size) { paragraphTransform(rs.styles, size * 0.5f) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(sid, cid) {
         if (rs.value.text.isBlank() && !viewing) {
@@ -642,7 +644,8 @@ private fun EditorBody(
                                         repo.setEditorSize(16)
                                     }, onTidy = {
                                         showFp = false
-                                        toast(ctx, if (rs.tidy()) "Blank lines removed" else "Nothing to tidy")
+                                        val removed = rs.tidy()
+                                        toast(ctx, if (removed > 0) "$removed blank line${if (removed == 1) "" else "s"} removed" else "Nothing to tidy")
                                     })
                                 }
                             }

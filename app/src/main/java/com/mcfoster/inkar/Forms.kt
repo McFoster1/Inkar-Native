@@ -78,8 +78,9 @@ fun AppTopBar(repo: Repo, showNav: Boolean, selected: Int, onSelect: (Int) -> Un
             Brand(18)
             if (showNav) {
                 Spacer(Modifier.width(20.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 Row(
-                    Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                    Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -97,6 +98,7 @@ fun AppTopBar(repo: Repo, showNav: Boolean, selected: Int, onSelect: (Int) -> Un
                             Txt(d.long, 15f, if (on) InkText else InkMuted, FontWeight.Medium, lh = 1.3f, maxLines = 1)
                         }
                     }
+                }
                 }
                 Spacer(Modifier.width(12.dp))
             } else {
@@ -238,11 +240,11 @@ fun DialogActions(cancel: String = "Cancel", onCancel: () -> Unit, actions: @Com
 }
 
 @Composable
-fun ConfirmModal(title: String, message: String, confirm: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+fun ConfirmModal(title: String, message: String, confirm: String, onDismiss: () -> Unit, danger: Boolean = true, onConfirm: () -> Unit) {
     HDialog(onDismiss) {
         Txt(title, 20f, InkText, FontWeight.SemiBold)
         Txt(message, 15f, InkMuted, modifier = Modifier.padding(top = 8.dp))
-        DialogActions(onCancel = onDismiss) { Btn(confirm, onConfirm, danger = true) }
+        DialogActions(onCancel = onDismiss) { Btn(confirm, onConfirm, danger = danger, primary = !danger) }
     }
 }
 

@@ -698,6 +698,23 @@ class Repo private constructor(context: Context) {
         }
     }
 
+    /** Removes blank lines from every chapter of a story. Returns how many chapters changed. */
+    fun tidyAll(sid: String): Int {
+        val s = storyJson(sid) ?: return 0
+        var n = 0
+        for (c in s.objs("chapters")) {
+            val html = c.optString("html", "")
+            val (t, st) = if (html.isNotBlank()) parseHtml(html) else plainText(c.optString("content", ""))
+            val r = tidyText(t, st) ?: continue
+            c.put("content", r.text)
+            c.put("html", toHtml(r.text, r.styles))
+            c.put("words", wc(r.text))
+            n++
+        }
+        if (n > 0) commit()
+        return n
+    }
+
     // ---------- settings ----------
 
     fun theme(): String {
