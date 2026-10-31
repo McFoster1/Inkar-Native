@@ -10,4 +10,4 @@ Go to **Actions > Build Kotlin APK > Run workflow**, enter a version (for exampl
 
 ## Status
 
-Phase 2.2: smaller paragraph gap, stronger Tidy blank lines plus Tidy all chapters, centred landscape nav, animated bars and a smoother Write tab. Stats tab is still a placeholder.
+Phase 2.3: editor rebuilt on a native text box (reliable typing, cursor and undo), compact layout, small paragraph gap, Tidy blank lines removed. Stats tab is still a placeholder.
